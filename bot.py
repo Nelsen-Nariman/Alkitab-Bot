@@ -11,6 +11,9 @@ from datetime import datetime
 from pytz import timezone
 import pytz
 import sqlite3
+import aiohttp
+from aiohttp import web
+import asyncio
 
 # Short and full book name mapping
 book_mapping = {
@@ -68,8 +71,17 @@ async def on_ready():
         
         scheduler.configure(jobstores=jobstores, job_defaults=job_defaults, timezone=jakarta_tz)
         scheduler.start()
+
+        # Start HTTP server
+        http_app = create_http_server()
+        runner = web.AppRunner(http_app)
+        await runner.setup()
+        site = web.TCPSite(runner, 'localhost', 8000)
+        await site.start()
+        print("HTTP Server started on http://localhost:8000")
+
     except Exception as e:
-        print(e)
+        print(f"Error during startup: {e}")
     
 
 # Helper function to find the target channel
@@ -116,6 +128,68 @@ def generate_bible_hyperlink(verse):
     display_name = full_name + (" " + remaining if remaining else "")
     return f"[{display_name}]({url})"
 
+# HTTP Server Route Handlers
+async def health_check(request):
+    """Simple health check endpoint"""
+    return web.Response(text="Bible Bot is running!", status=200)
+
+async def get_reading_reports(request):
+    """Endpoint to retrieve reading reports"""
+    conn = sqlite3.connect('reading_tracker.db')
+    try:
+        cursor = conn.cursor()
+        cursor.execute('''
+        SELECT 
+            ReadingReport_ID, 
+            Date, 
+            Bible_Verse, 
+            Usernames,
+            (LENGTH(Usernames) - LENGTH(REPLACE(Usernames, ',', '')) + 1) AS Total_Read
+        FROM reading_reports
+        ''')
+        
+        reports = cursor.fetchall()
+        
+        # Convert to list of dictionaries
+        column_names = [
+            'ReadingReport_ID', 
+            'Date', 
+            'Bible_Verse', 
+            'Usernames', 
+            'Total_Read'
+        ]
+        
+        reports_list = [dict(zip(column_names, report)) for report in reports]
+        
+        return web.json_response(reports_list)
+    except sqlite3.Error as e:
+        return web.json_response({"error": str(e)}, status=500)
+    finally:
+        conn.close()
+
+async def start_background_tasks(app):
+    """Start background tasks when the app starts"""
+    # You can add any additional background tasks here if needed
+    pass
+
+async def cleanup_background_tasks(app):
+    """Cleanup background tasks when the app shuts down"""
+    # Add any cleanup logic if necessary
+    pass
+
+def create_http_server():
+    """Create and configure the HTTP server"""
+    app = web.Application()
+    
+    # Add routes
+    app.router.add_get('/', health_check)
+    app.router.add_get('/reports', get_reading_reports)
+    
+    # Add lifecycle hooks
+    app.on_startup.append(start_background_tasks)
+    app.on_cleanup.append(cleanup_background_tasks)
+    
+    return app
     
 # SQLite Database for Tracking
 def init_database():
@@ -766,4 +840,11 @@ async def send_bible_verse(channel, verses, reading_plan_id):
     await channel.send(final_message, view=ReadingDoneView(reading_plan_id, current_date, verses))
 
 # Run bot
-bot.run(TOKEN)
+async def main():
+    async with bot:
+        # Start the bot
+        await bot.start(TOKEN)
+
+if __name__ == "__main__":
+    # Run both Discord bot and HTTP server
+    asyncio.run(main())
