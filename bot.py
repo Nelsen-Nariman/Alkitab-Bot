@@ -766,13 +766,20 @@ async def send_bible_verse(channel, verses, reading_plan_id):
     # Get the current date in the format you used in the import
     current_date = datetime.now(jakarta_tz).strftime("%Y-%m-%d")
     
+    # Prefix and suffix messages
+    prefix_message = "Selamat Pagi! Berikut adalah bacaan pada hari ini.\n"
+    suffix_message = "\nSelamat membaca! Tuhan Yesus memberkati."
+
     messages = []
     for verse in verses:
         hyperlink = generate_bible_hyperlink(verse.strip())
         messages.append(f"- {hyperlink}")
 
     # Combine messages with new lines
-    final_message = "\n".join(messages)
+    hyperlinks_message = "\n".join(messages)
+
+    # Combine the full message with prefix, hyperlinks, and suffix
+    final_message = f"{prefix_message}{hyperlinks_message}{suffix_message}"
     
     # Create a view with a "Done" button
     class ReadingDoneView(discord.ui.View):
@@ -796,12 +803,14 @@ async def send_bible_verse(channel, verses, reading_plan_id):
             if username in self.users_reported:
                 try:
                     await interaction.followup.send(
-                        f"Hello, {interaction.user.mention}! Your reading record was already saved before."
+                        f"Halo {interaction.user.mention}, pembacaan Anda atas ayat-ayat ini telah tercatat sebelumnya.",
+                        ephemeral=True
                     )
                 except discord.errors.NotFound:
                     # Fallback if the original interaction has timed out
                     await interaction.channel.send(
-                        f"Hello, {interaction.user.mention}! Your reading record was already saved before."
+                        f"Halo {interaction.user.mention}, pembacaan Anda atas ayat-ayat ini telah tercatat sebelumnya.",
+                        ephemeral=True
                     )
                 return
             
@@ -819,21 +828,25 @@ async def send_bible_verse(channel, verses, reading_plan_id):
                     self.users_reported.add(username)
                     
                     await interaction.followup.send(
-                        f"Thanks, {interaction.user.mention}! Your reading for these verses has been recorded."
+                        f"Terima kasih {interaction.user.mention}, pembacaan Anda atas ayat-ayat tersebut telah dicatat.",
+                        ephemeral=True
                     )
                 else:
                     await interaction.followup.send(
-                        f"Sorry, {interaction.user.mention}. There was an issue saving your reading record."
+                        f"Maaf {interaction.user.mention}, terdapat kesalahan didalam mencatat pembacaanmu.",
+                        ephemeral=True
                     )
             except discord.errors.NotFound:
                 # Fallback method if interaction has timed out
                 if report_saved:
                     await interaction.channel.send(
-                        f"Thanks, {interaction.user.mention}! Your reading for these verses has been recorded."
+                        f"Terima kasih {interaction.user.mention}, pembacaan Anda atas ayat-ayat tersebut telah dicatat.",
+                        ephemeral=True
                     )
                 else:
                     await interaction.channel.send(
-                        f"Sorry, {interaction.user.mention}. There was an issue saving your reading record."
+                        f"Maaf {interaction.user.mention}, terdapat kesalahan didalam mencatat pembacaanmu.",
+                        ephemeral=True
                     )
 
     # Send message with the "Done" button
