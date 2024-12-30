@@ -784,7 +784,7 @@ async def send_bible_verse(channel, verses, reading_plan_id):
     # Create a view with a "Done" button
     class ReadingDoneView(discord.ui.View):
         def __init__(self, reading_plan_id, date, verses):
-            super().__init__()
+            super().__init__(timeout=None)
             self.reading_plan_id = reading_plan_id
             self.date = date
             self.verses = ", ".join(verses)
